@@ -13,7 +13,8 @@ import sys
 
 URL = "https://www.news29.ru/novosti/ekonomika/"
 
-sys.path.insert(0, os.path.dirname(__file__) + "/chromedriver.exe")
+# sys.path.insert(0, os.path.dirname(__file__) + "/chromedriver.exe")
+sys.path.insert(0, "chromedriver.exe")
 
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument("--headless")
@@ -44,71 +45,64 @@ def parse():
         "div", {"class": "newItemContainer"}
     )  # получение всех div с классом 'newItemContainer', который содержит всю необходимую информацию
 
+    print("Парсим...")
     for block in location_blocks:
-        link = []
         title = []
+        link = []
         publdate = []
         viewCount = []
-        tags = []
-        tagsAll = []
         data = []
 
-        block_title = block.find("div").find(
-            "a", {"class": "list-item__title color-font-hover-only"}
-        )
-        if block_title is not None:
-            title.append(block_title) # заголовок
+        block_title_div = block.find("div", {"class": "title"}).find("a")
 
-        link.append(
-            block.find("a", {"class": "list-item__title color-font-hover-only"}).get(
-                "href"
-            )
-        )  # Ссылка
+        block_title = block_title_div.find(text=True).strip()
+        title.append(block_title)  # заголовок
 
-        block_title = block.find("div", {"class": "list-item__info"}).find(
-            "div", {"class": "list-item__date"}
-        )
-        if block_title is not None:
-            publdate.append(block_title)  # дата публикации
+        block_link = "https://www.news29.ru" + block_title_div.get("href")
+        link.append(block_link)  # ссылка
 
-        block_viewCount = (
-            block.find("div", {"class": "list-item__info"})
-            .find("div", {"class": "list-item__views"})
-            .find("div", {"class": "list-item__views-text"})
-        )
-        if block_viewCount is not None:
-            block_viewCount.append(block_viewCount)  # количество просмотров
+        block_publdate = block.find("div", {"class": "date"}).find(text=True).strip()
+        publdate.append(block_publdate)  # дата публикации
 
-        tagsAll = block.find("ul")  # берем весь список тегов
-        for itemLi in tagsAll:
-            tags.append(itemLi.find("a").text)  # раскидываем каждый элемент
+        block_viewCount = block.find("div", {"class": "viewscount"}).text.strip()
+        if len(block_viewCount.split("\n ")) > 1:
+            block_viewCount = block_viewCount.split("\n ")[1]
+        elif len(block_viewCount.split("  ")) > 1:
+            block_viewCount = block_viewCount.split("  ")[1]
+        else:
+            block_viewCount = None
+        viewCount.append(block_viewCount)  # количество просмотров
 
-        data.append(title)
-        data.append(link)
-        data.append(publdate)
-        data.append(viewCount)
-        data.append(tags)
+        data.append(title[0])
+        data.append(link[0])
+        data.append(publdate[0])
+        data.append(viewCount[0])
         with open("harvest_data.csv", mode="a", encoding="utf-8-sig") as f:
             writer = csv.writer(f)
             writer.writerow(data)
 
 
-wait = WebDriverWait(wd, 30)
-# wait.until(
-#     EC.element_to_be_clickable((By.CLASS_NAME, "list-more"))
-# )  # Ждем пока кнопка "Показать больше" будет готова
+def click_more_news_button(left=0, right=1000, step=10):
+    wait = WebDriverWait(wd, 30)
+    print("Ждём, пока кнопка 'Показать еще' будет готова...")
+    wait.until(
+        EC.element_to_be_clickable((By.ID, "moreNews"))
+    )  # Ждем пока кнопка "Показать больше" будет готова
+    x = left
+    print("Тыкаем на кнопку 'Показать ещё'...")
+    while (
+        x < right
+    ):  # создаем длинный цикл, чтобы проявить статьи вызывающиеся по кнопке "Показать больше"
+        time.sleep(0.5)
+        wd.execute_script(
+            "var moreNewsButton = document.getElementById('moreNews'); "
+            "if (moreNewsButton != null) moreNewsButton.click()"
+        )
+        x = x + step
+    time.sleep(2)  # немного ждем, чтобы не потерять последние статьи
 
-# x = 0
-# while (
-#     x < 2000
-# ):  # создаем длинный цикл, чтобы проявить статьи вызывающиеся по кнопке "Показать больше"
-#     time.sleep(0.5)
-#     wd.execute_script(
-#         'document.querySelector("#content > div > div.layout-rubric__main > div > div.list-more").click()'
-#     )  # Имитируем нажатие на кнопку исполняя скрипт с указанием click()
-#     x = x + 10
 
-time.sleep(2)  # немного ждем, чтобы не потерять последние статьи
+click_more_news_button(0, 2000, 10)
 parse()
 
 wd.quit()
